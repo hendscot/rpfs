@@ -10,10 +10,13 @@ import stat
 from fuse import FUSE, FuseOSError, Operations
 
 
-class Passthrough(Operations):
-    def __init__(self, root):
-        self.root = root
-        os.open(self.root + "/test.txt", os.O_CREAT)
+class RPYFS(Operations):
+    def __init__(self, mountpoint, fname):
+        # change root later?
+        self.root  = mountpoint
+        self.filep = self.root + "/" + fname
+        # create our dynam file within mntpoint
+        self.fh = os.open(self.filep, os.O_CREAT|os.O_RDONLY)
 
     # Helpers
     # =======
@@ -34,21 +37,22 @@ class Passthrough(Operations):
             raise FuseOSError(errno.EACCES)
 
     def chmod(self, path, mode):
-        print ("init")
         full_path = self._full_path(path)
         return os.chmod(full_path, mode)
 
     def chown(self, path, uid, gid):
-        print ("init")
         full_path = self._full_path(path)
         return os.chown(full_path, uid, gid)
 
     def getattr(self, path, fh=None):
         full_path = self._full_path(path)
-        st = os.lstat(full_path)
-        return dict((key, getattr(st, key)) for key in ('st_atime', 'st_ctime',
-                     'st_gid', 'st_mode', 'st_mtime', 'st_nlink', 'st_size', 'st_uid'))
-
+        mode = os.stat(full_path).st_mode
+        if IS_DIR(mode):
+            pass
+        elif IS_REG(mode):
+            pass
+        else:
+            pass
     def readdir(self, path, fh):
         full_path = self._full_path(path)
 
@@ -58,23 +62,16 @@ class Passthrough(Operations):
         for r in dirents:
             yield r
 
-    def readlink(self, path):
-        pathname = os.readlink(self._full_path(path))
-        if pathname.startswith("/"):
-            # Path name is absolute, sanitize it.
-            return os.path.relpath(pathname, self.root)
-        else:
-            return pathname
-
-    def mknod(self, path, mode, dev):
-        return os.mknod(self._full_path(path), mode, dev)
-
-    def rmdir(self, path):
-        full_path = self._full_path(path)
-        return os.rmdir(full_path)
-
-    def mkdir(self, path, mode):
-        return os.mkdir(self._full_path(path), mode)
+    readlink = none
+    mknod    = none
+    rmdi     = none
+    mkdir    = none
+    rename   = none
+    link     = none
+    utimens  = none
+    link     = none
+    symlink  = none
+    unlink   = none
 
     def statfs(self, path):
         full_path = self._full_path(path)
@@ -82,22 +79,11 @@ class Passthrough(Operations):
         return dict((key, getattr(stv, key)) for key in ('f_bavail', 'f_bfree',
             'f_blocks', 'f_bsize', 'f_favail', 'f_ffree', 'f_files', 'f_flag',
             'f_frsize', 'f_namemax'))
-
-    def unlink(self, path):
-        return os.unlink(self._full_path(path))
-
-    def symlink(self, name, target):
-        return os.symlink(name, self._full_path(target))
-
-    def rename(self, old, new):
-        return os.rename(self._full_path(old), self._full_path(new))
-
-    def link(self, target, name):
-        return os.link(self._full_path(target), self._full_path(name))
-
-    def utimens(self, path, times=None):
-        return os.utime(self._full_path(path), times)
-
+    
+    # test...will this even run??
+    def destroy(self):
+        self.fh.close()
+        os.remove(self.fh.name)
     # File methods
     # ============
 
@@ -132,8 +118,8 @@ class Passthrough(Operations):
         return self.flush(path, fh)
 
 
-def main(mountpoint, root):
-    FUSE(Passthrough(root), mountpoint, nothreads=True, foreground=True)
+def main(mountpoint, fname):
+    FUSE(RPYFS(mountpoint, fname), mountpoint, nothreads=True, foreground=True)
 
 if __name__ == '__main__':
     main(sys.argv[2], sys.argv[1])

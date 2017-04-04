@@ -6,7 +6,7 @@ import os
 import sys
 import errno
 import stat
-
+from time import time
 from fuse import FUSE, FuseOSError, Operations
 
 
@@ -48,11 +48,14 @@ class RPYFS(Operations):
         full_path = self._full_path(path)
         mode = os.stat(full_path).st_mode
         if IS_DIR(mode):
-            pass
+            st = dict(st_mode=(S_IFDIR | 0o755), st_nlink=2)
         elif IS_REG(mode):
-            pass
+            st = dict(st_mode=(S_IFREG | 0o444), st_size=size)
         else:
             pass
+        st['st_ctime'] = st['st_mtime'] = st['st_atime'] = time()
+        return st
+    
     def readdir(self, path, fh):
         full_path = self._full_path(path)
 

@@ -1,128 +1,85 @@
 #!/usr/bin/env python
 
-from __future__ import with_statement
+#    Copyright (C) 2006  Andrew Straw  <strawman@astraw.com>
+#
+#    This program can be distributed under the terms of the GNU LGPL.
+#    See the file COPYING.
+#
 
-import os
-import sys
-import errno
-import stat
-from time import time
-from fuse import FUSE, FuseOSError, Operations
+import os, stat, errno, sys
+# pull in some spaghetti to make this stuff work without fuse-py being installed
+try:
+    import _find_fuse_parts
+except ImportError:
+    pass
+import fuse
+from fuse import Fuse
 
 
-class RPYFS(Operations):
-    def __init__(self, mountpoint, fname):
-        # change root later?
-        self.root  = mountpoint
-        self.filep = self.root + "/" + fname
-        # create our dynam file within mntpoint
-        self.fh = os.open(self.filep, os.O_CREAT|os.O_RDONLY)
+if not hasattr(fuse, '__version__'):
+    raise RuntimeError, \
+        "your fuse-py doesn't know of fuse.__version__, probably it's too old."
 
-    # Helpers
-    # =======
+fuse.fuse_python_api = (0, 2)
 
-    def _full_path(self, partial):
-        if partial.startswith("/"):
-            partial = partial[1:]
-        path = os.path.join(self.root, partial)
+rand_path = '/rand'
 
-        return path
+class MyStat(fuse.Stat):
+    def __init__(self):
+        self.st_mode = 0
+        self.st_ino = 0
+        self.st_dev = 0
+        self.st_nlink = 0
+        self.st_uid = 0
+        self.st_gid = 0
+        self.st_size = 0
+        self.st_atime = 0
+        self.st_mtime = 0
+        self.st_ctime = 0
 
-    # Filesystem methods
-    # ==================
+class RandFS(Fuse):
 
-    def access(self, path, mode):
-        full_path = self._full_path(path)
-        if not os.access(full_path, mode):
-            raise FuseOSError(errno.EACCES)
-
-    def chmod(self, path, mode):
-        full_path = self._full_path(path)
-        return os.chmod(full_path, mode)
-
-    def chown(self, path, uid, gid):
-        full_path = self._full_path(path)
-        return os.chown(full_path, uid, gid)
-
-    def getattr(self, path, fh=None):
-        full_path = self._full_path(path)
-        mode = os.stat(full_path).st_mode
-        if IS_DIR(mode):
-            st = dict(st_mode=(S_IFDIR | 0o755), st_nlink=2)
-        elif IS_REG(mode):
-            st = dict(st_mode=(S_IFREG | 0o444), st_size=size)
+    def getattr(self, path):
+        st = MyStat()
+        if path == '/':
+            st.st_mode = stat.S_IFDIR | 0755
+            st.st_nlink = 2
         else:
-            pass
-        st['st_ctime'] = st['st_mtime'] = st['st_atime'] = time()
+            st.st_mode = stat.S_IFREG | 0444
+            st.st_nlink = 1
+            st.st_size = 100
         return st
-    
-    def readdir(self, path, fh):
-        full_path = self._full_path(path)
 
-        dirents = ['.', '..']
-        if os.path.isdir(full_path):
-            dirents.extend(os.listdir(full_path))
-        for r in dirents:
-            yield r
-
-    readlink = none
-    mknod    = none
-    rmdi     = none
-    mkdir    = none
-    rename   = none
-    link     = none
-    utimens  = none
-    link     = none
-    symlink  = none
-    unlink   = none
-
-    def statfs(self, path):
-        full_path = self._full_path(path)
-        stv = os.statvfs(full_path)
-        return dict((key, getattr(stv, key)) for key in ('f_bavail', 'f_bfree',
-            'f_blocks', 'f_bsize', 'f_favail', 'f_ffree', 'f_files', 'f_flag',
-            'f_frsize', 'f_namemax'))
-    
-    # test...will this even run??
-    def destroy(self):
-        self.fh.close()
-        os.remove(self.fh.name)
-    # File methods
-    # ============
+    def readdir(self, path, offset):
+        for r in  '.', '..', rand_path[1:]:
+            yield fuse.Direntry(r)
 
     def open(self, path, flags):
-        full_path = self._full_path(path)
-        return os.open(full_path, flags)
+        # might need to work on this??
+        accmode = os.O_RDONLY | os.O_WRONLY | os.O_RDWR
+        if (flags & accmode) != os.O_RDONLY:
+            return -errno.EACCES
 
-    def create(self, path, mode, fi=None):
-        full_path = self._full_path(path)
-        return os.open(full_path, os.O_WRONLY | os.O_CREAT, mode)
+    def read(self, path, size, offset):
+        # easier to use os.open...must have absolute pathname!
+        # currently opens and returns 100 bytes of fs script...
+        fh = os.open("/home/scotth3n/Documents/python-fuse-master/example/rpfs.py", os.O_RDONLY)
+        # size will automatically be size of file
+        # can set this value lower, but cannot be set higher than st_size
+        # set above in getattr
+        buf = os.read(fh, size)
+        os.close(fh)
+        return buf
 
-    def read(self, path, length, offset, fh):
-        os.lseek(fh, offset, os.SEEK_SET)
-        return os.read(fh, length)
+def main():
+    usage="""
+""" + Fuse.fusage
+    server = RandFS(version="%prog " + fuse.__version__,
+                     usage=usage,
+                     dash_s_do='setsingle')
 
-    def write(self, path, buf, offset, fh):
-        os.lseek(fh, offset, os.SEEK_SET)
-        return os.write(fh, buf)
-
-    def truncate(self, path, length, fh=None):
-        full_path = self._full_path(path)
-        with open(full_path, 'r+') as f:
-            f.truncate(length)
-
-    def flush(self, path, fh):
-        return os.fsync(fh)
-
-    def release(self, path, fh):
-        return os.close(fh)
-
-    def fsync(self, path, fdatasync, fh):
-        return self.flush(path, fh)
-
-
-def main(mountpoint, fname):
-    FUSE(RPYFS(mountpoint, fname), mountpoint, nothreads=True, foreground=True)
+    server.parse(errex=1)
+    server.main()
 
 if __name__ == '__main__':
-    main(sys.argv[2], sys.argv[1])
+    main()

@@ -77,7 +77,7 @@ class RandFS(Fuse):
         # read 8 bits into buffer
         bitbuf = bits.read('bin:8')
         buf = chr(int(bitbuf, 2))
-        for i in range(1, 25):
+        for i in range(1, totalBytes):
             bitbuf = bits.read('bin:8')
             # can also be converted to integer with int(bitbuf, 2)
             buf += chr(int(bitbuf, 2))

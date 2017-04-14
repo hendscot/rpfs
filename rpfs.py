@@ -16,8 +16,8 @@ import fuse
 from fuse import Fuse
 # sudo apt-get install python-bitsring
 # if on your own system CHECK IF ON UNIVERSITY/PI??
-from bitstring import BitStream
-
+from bitarray import bitarray
+import tempfile
 
 if not hasattr(fuse, '__version__'):
     raise RuntimeError, \
@@ -59,29 +59,26 @@ class RandFS(Fuse):
 
     def open(self, path, flags):
         # might need to work on this??
+        if path != bit_path:
+            return path
         accmode = os.O_RDONLY | os.O_WRONLY | os.O_RDWR
         if (flags & accmode) != os.O_RDONLY:
             return -errno.EACCES
 
-    def read(self, path, size, offset):
+
+    def read(self, path, size, offset, fh):
         # easier to use os.open...must have absolute pathname!
         # currently opens and returns 100 bytes of fs script...
         # we need to make sure BitStream is supported on running environment
         # it is an official Python module, but is not installed by default
-        bits = BitStream(filename=bit_path)
-        totalBytes = os.path.getsize(bit_path)
+        fh = os.open(bit_path, os.O_RDONLY)
+        fileh = os.fdopen(fh)
+        bits = bitarray()
+        bits.fromfile(fileh, 2)
+        bitarray(bits).tostring()
         # TODO check if size of rand file is large enough
         # for request
-        if totalBytes > size:
-            pass
-        # read 8 bits into buffer
-        bitbuf = bits.read('bin:8')
-        buf = chr(int(bitbuf, 2))
-        for i in range(1, totalBytes):
-            bitbuf = bits.read('bin:8')
-            # can also be converted to integer with int(bitbuf, 2)
-            buf += chr(int(bitbuf, 2))
-        return buf
+        return bits
 
 def main():
     usage="""

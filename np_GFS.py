@@ -117,6 +117,13 @@ class GFS(Fuse):
             #Ignore size, size = w/e size the number is
             #Path = the name of the file to access(gCPM)
             #buf = return variable to be filled with data
+
+            #ALG:
+              #1. Get the data from the randbits.txt file
+              #2. Sort data into array of each line as one element
+              #3. Use first element as start of minute(elements are timestamps)
+              #4. Figure out which element is closest to 1min + first element
+              #5. Count num of elements between these two. Return count.
         else:
             return -errno.ENOENT
         return buf

@@ -49,7 +49,7 @@ class MyStat(fuse.Stat):
         self.st_mtime = 0
         self.st_ctime = 0
 
-class HelloFS(Fuse):
+class GFS(Fuse):
 
     def getattr(self, path):
         st = MyStat()
@@ -92,19 +92,43 @@ class HelloFS(Fuse):
                 buf = hello_str[offset:offset+size]
             else:
                 buf = ''
-        elif path == gRand_path or path == gCPM_path:
-            #All we need to do is return the number of digits
-            #that are requested by "size" attribute, ignore offset
-            #or the current CPM value
+        elif path == gRand_path:
+            #Ignore offset
+            #Size = num of rand numbers requested
+            #Path = the name of the file to access(gRand)
+            #buf = return variable to be filled with data
+
+            #ALG:
+              #1. Get the data from the randbits.txt file
+              #2. Sort data into array of each line as one element
+              #3. Based on "size" determine if enough elements are available for request(sizex9){9C2}
+              #4. If not enough elements, attempt to generate more, jmp #?
+              #5. If enough elements, use combination math and comparisons to generate 32bits x size
+              #6. Pack each 32bit set into a number and add number as an element to the return variable
+              #   jmp, #11
+              #7. Determine amount of elements to generate based on current element count and "size"
+              #8. Repeat Until requirements met: Use each element + timestamp to gen. new rand num.
+              #9. After first run, use new rand numbers + timestamp to gen new rand numbers.
+              #10. Once finished, jmp #5.
+              #11. Finally clear all used elements from the randbits file
+
+        elif path == gCPM_path:
+            #Ignore offset
+            #Ignore size, size = w/e size the number is
+            #Path = the name of the file to access(gCPM)
+            #buf = return variable to be filled with data
         else:
             return -errno.ENOENT
         return buf
 
 def main():
     usage="""
-Userspace hello example
+GFS - Geiger File System\n
+\n
+This file system is designed to simulate a file based access\n
+method to retrieve random bits/numbers from geiger counter hardware.
 """ + Fuse.fusage
-    server = HelloFS(version="%prog " + fuse.__version__,
+    server = GFS(version="%prog " + fuse.__version__,
                      usage=usage,
                      dash_s_do='setsingle')
 

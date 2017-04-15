@@ -102,7 +102,7 @@ class GFS(Fuse):
               #1. Get the data from the randbits.txt file
               #2. Sort data into array of each line as one element
               #3. Based on "size" determine if enough elements are available for request(sizex9){9C2}
-              #4. If not enough elements, attempt to generate more, jmp #?
+              #4. If not enough elements, attempt to generate more, jmp #7
               #5. If enough elements, use combination math and comparisons to generate 32bits x size
               #6. Pack each 32bit set into a number and add number as an element to the return variable
               #   jmp, #11

@@ -1,0 +1,5 @@
+GFS - Geiger File System
+
+This filesystem is designed to create a file based access
+method to retrieve random bits/numbers from a geiger counter
+hardware.

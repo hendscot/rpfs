@@ -68,19 +68,18 @@ class RandFS(Fuse):
         # currently opens and returns 100 bytes of fs script...
         # we need to make sure BitStream is supported on running environment
         # it is an official Python module, but is not installed by default
-        bits = BitStream(filename=bit_path)
         totalBytes = os.path.getsize(bit_path)
+        bytes      = numpy.fromfile(bit_path, dtype="uint8")
+        buf = ""
         # TODO check if size of rand file is large enough
         # for request
         if totalBytes > size:
-            pass
-        # read 8 bits into buffer
-        bitbuf = bits.read('bin:8')
-        buf = chr(int(bitbuf, 2))
-        for i in range(1, totalBytes):
-            bitbuf = bits.read('bin:8')
-            # can also be converted to integer with int(bitbuf, 2)
-            buf += chr(int(bitbuf, 2))
+            for by in bytes:
+                buf += str(int(by, 2))
+                buf += '\n'
+        else:
+            bits = numpy.unpackbits(bytes)
+            
         return buf
 
 def main():

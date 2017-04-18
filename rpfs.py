@@ -63,10 +63,6 @@ class RandFS(Fuse):
             return -errno.EACCES
 
     def read(self, path, size, offset):
-        # easier to use os.open...must have absolute pathname!
-        # currently opens and returns 100 bytes of fs script...
-        # we need to make sure BitStream is supported on running environment
-        # it is an official Python module, but is not installed by default
         totalBytes = os.path.getsize(bit_path)
         bytes      = numpy.fromfile(bit_path, dtype="uint8")
         buf = ""
@@ -77,8 +73,13 @@ class RandFS(Fuse):
                 buf += str(int(by, 2))
                 buf += '\n'
         else:
-            bits = numpy.unpackbits(bytes)
-            
+            indx = 0
+            bitstr = numpy.unpackbits(bytes)
+            for i in range(0, totalBytes)
+                bitsub = bitstr[indx:indx+8]
+                indx += 8
+                buf += str(int(bitstr, 2)) + "\n"
+            #generate rand bits
         return buf
 
 def main():

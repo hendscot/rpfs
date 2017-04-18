@@ -16,8 +16,7 @@ import fuse
 from fuse import Fuse
 # sudo apt-get install python-bitsring
 # if on your own system CHECK IF ON UNIVERSITY/PI??
-from bitstring import BitStream
-
+import numpy
 
 if not hasattr(fuse, '__version__'):
     raise RuntimeError, \

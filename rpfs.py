@@ -17,6 +17,7 @@ from fuse import Fuse
 # sudo apt-get install python-bitsring
 # if on your own system CHECK IF ON UNIVERSITY/PI??
 import numpy
+import random
 
 if not hasattr(fuse, '__version__'):
     raise RuntimeError, \
@@ -49,7 +50,7 @@ class RandFS(Fuse):
         else:
             st.st_mode = stat.S_IFREG | 0444
             st.st_nlink = 1
-            st.st_size = os.path.getsize(bit_path)
+            st.st_size = 100
         return st
 
     def readdir(self, path, offset):
@@ -71,13 +72,20 @@ class RandFS(Fuse):
         num = ""
         # TODO check if size of rand file is large enough
         # for request
-        size = 4
         bits = numpy.unpackbits(bytes)
         indx = 0
         for byte in bytes:
             curByte = self.bytetostring(bits[indx:indx+8])
             num += chr(int(curByte, 2))
             indx += 8
+        if totalBytes < 100:
+            while totalBytes < 100:
+                i = 0
+                while i < 4:
+                    num += chr(random.randint(49, 57))
+                    totalBytes = totalBytes + 1
+                    i = i + 1
+                num += "\n"
         return num
     def bytetostring(self, byte):
         sbuf = ""

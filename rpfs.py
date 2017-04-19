@@ -25,7 +25,7 @@ if not hasattr(fuse, '__version__'):
 fuse.fuse_python_api = (0, 2)
 
 rand_path = '/rand'
-bit_path = "/home/scotth3n/Documents/python-fuse-master/example/rand.py"
+bit_path = "/home/scotth3n/Documents/python-fuse-master/example/file.txt"
 class MyStat(fuse.Stat):
     def __init__(self):
         self.st_mode = 0
@@ -58,30 +58,32 @@ class RandFS(Fuse):
 
     def open(self, path, flags):
         # might need to work on this??
+        if path != bit_path:
+            return path
         accmode = os.O_RDONLY | os.O_WRONLY | os.O_RDWR
         if (flags & accmode) != os.O_RDONLY:
             return -errno.EACCES
 
-    def read(self, path, size, offset):
+    def read(self, path, size, offset, fh):
         totalBytes = os.path.getsize(bit_path)
         bytes      = numpy.fromfile(bit_path, dtype="uint8")
         buf = ""
+        num = ""
         # TODO check if size of rand file is large enough
         # for request
-        if totalBytes > size:
-            for by in bytes:
-                buf += str(int(by, 2))
-                buf += '\n'
-        else:
-            indx = 0
-            bitstr = numpy.unpackbits(bytes)
-            for i in range(0, totalBytes)
-                bitsub = bitstr[indx:indx+8]
-                indx += 8
-                buf += str(int(bitstr, 2)) + "\n"
-            #generate rand bits
-        return buf
-
+        size = 4
+        bits = numpy.unpackbits(bytes)
+        indx = 0
+        for byte in bytes:
+            curByte = self.bytetostring(bits[indx:indx+8])
+            num += chr(int(curByte, 2))
+            indx += 8
+        return num
+    def bytetostring(self, byte):
+        sbuf = ""
+        for bit in byte:
+            sbuf += str(bit)
+        return sbuf
 def main():
     usage="""
 """ + Fuse.fusage

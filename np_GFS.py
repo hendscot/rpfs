@@ -53,7 +53,8 @@ class MyStat(fuse.Stat):
         self.st_ctime = 0
 
 class GFS(Fuse):
-
+    def __init__(self):
+        self.timesRead = 0
     def getattr(self, path):
         st = MyStat()
         if path == '/':
@@ -110,6 +111,7 @@ class GFS(Fuse):
                 print "Unable to open file ", fo.name, "\n"
               else:
                 print fo.name, " has been successfully opened!\n"
+                self.timesRead += 1
                 
                 #Read the file line by line
                 n = 0 #element counter

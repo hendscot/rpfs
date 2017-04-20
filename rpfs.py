@@ -1,11 +1,18 @@
 #!/usr/bin/env python
 #    Modified version of hello.py from python-fuse examples by Andrew Straw
+#    Modified and Tested by Allo Aymard Assa, Michal Meeker, 
+#                           Nathan Poole, Alfred Aboli and
+#                           Scott Henderson
 #    Copyright (C) 2006  Andrew Straw  <strawman@astraw.com>
 #
 #    This program can be distributed under the terms of the GNU LGPL.
 #    See the file COPYING.
 #
-
+#    RandFS is a specialized file system that does not support creating new files/directories 
+#    it simply supports opening a pre-defined file, rand, which returns pseudorandom numbers
+#    based on bit input from a file of pseudorandom bits produced by a geiger counter
+#    connected to a RaspberryPi
+#
 import os, stat, errno, sys
 # pull in some spaghetti to make this stuff work without fuse-py being installed
 try:
@@ -14,8 +21,6 @@ except ImportError:
     pass
 import fuse
 from fuse import Fuse
-# sudo apt-get install python-bitsring
-# if on your own system CHECK IF ON UNIVERSITY/PI??
 import numpy
 import random
 import time
@@ -63,7 +68,6 @@ class RandFS(Fuse):
             yield fuse.Direntry(r)
 
     def open(self, path, flags):
-        # might need to work on this??
         if path != BIT_PATH:
             return path
         accmode = os.O_RDONLY | os.O_WRONLY | os.O_RDWR
@@ -71,38 +75,68 @@ class RandFS(Fuse):
             return -errno.EACCES
 
     def read(self, path, size, offset, fh):
+        # We only support reading our "rand" file
         if path == RAND_PATH:
+            # totalBytes tracks how many bytes returning
             totalBytes = 0
+            # load rand bits file into an ndarray of bytes
             bytes      = numpy.fromfile(BIT_PATH, dtype="uint8")
+            # this will be returned, basically a string of all rand ints
             randIntBuf = ""
+            # string of "1"s and "0"s stores conversion from ndarray of bits
             bitstring  = ""
+            # how many bytes did we use from the file
             bytesUsed  = 0
-            # TODO check if size of rand file is large enough
-            # for request
+            # store an ndarray of bits from bytes
             bits = numpy.unpackbits(bytes)
+            # do have enough bits for at least one 32-bit int
             if bits.size >= INT_SIZE:
+                # while we have enough bits for at least one 32-bit int
                 while bits.size >= INT_SIZE:
+                    # convert first 32 bits to a regular python string
                     bitstring = self.bitstostring(bits[:INT_SIZE])
+                    # convert that string of bits to an integer, and then to a string
+                    # then that gets appended to our return buf (with a newline char)
                     randIntBuf += str(int(bitstring, 2)) + '\n'
+                    # dispose of those bits
                     bits = bits[INT_SIZE:]
-                    self.seed = bitstring[0]
+                    # we used 32 bits so 4 bytes
                     bytesUsed += 4
+                # our total byte amount is equal to the length of our buffer
                 totalBytes += len(randIntBuf)
+                # dispose of the bytes used
                 bytes = bytes[bytesUsed:]
+                # now write remaining bytes to the rand bits file
+                # this isn't ideal, as we currently are reading 
+                # the entire file regardless of request
                 bytes.tofile(BIT_PATH)
+            # seed with time
             random.seed(time.time())
+            # generate more numbers until we reach our
+            # arbitrary max size
+            # this could overflow if totalBytes + 5 > FILE_SIZE
+            # but shouldn't cause any problems
             while totalBytes < FILE_SIZE:
                 bitstring = ""
+                # we want 32 bits
                 for i in range (0, 32):
+                    # generate a float between 0 and 1
+                    # if over .5, we want a 1
                     if random.uniform(0, 1) > .5:
                         bitstring += "1"
+                    # less than or = to .5 we want a 0
                     else:
                         bitstring += "0"
+                # append new number and newline to return buffer
                 randIntBuf += str(int(bitstring, 2)) + "\n"
+                # update totalBytes size
                 totalBytes = len(randIntBuf)
+            #now we can return buffer
             return randIntBuf
+        # reading any file but our random bits is not supported!
         else:
             return -errno.ENOENT
+    # helper function which converts an ndarray of bits to string of bits
     def bitstostring(self, bits):
         sbuf = ""
         for bit in bits:

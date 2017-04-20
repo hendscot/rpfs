@@ -30,14 +30,14 @@ hello_path = '/hello'         #simulated file name
 hello_str = 'Hello World!\n'  #simulated file content
 
 #Adding two new files names
-gRand_path = '/g_rand'
-gCPM_path = '/g_cpm'
+GRAND_PATH = '/g_rand'
+GCPM_PATH = '/g_cpm'
 
 #Full path to the random bits file
 BIT_PATH = "/home/nmpoole/fuse/randtimegeiger.txt"
 
 #A new size value for the files
-FILE_SIZE = 12
+FILE_SIZE = 100
 
 class MyStat(fuse.Stat):
     def __init__(self):
@@ -53,17 +53,23 @@ class MyStat(fuse.Stat):
         self.st_ctime = 0
 
 class GFS(Fuse):
+
+    #Initialize GFS class
     def __init__(self, *args, **kw):
+        
+        #Initialize Fuse parent class
         Fuse.__init__(self, *args, **kw)
-        #For some reason the read function
-        #is ran multiple times for a single read
-        #We need buf to be a class variable so 
-        #that it doesn't get overwritten on those
-        #extra calls after we edit the bits file.
+        
+        #Class variable to hold onto random num
+        #we generate for g_rand file
         self.randNum = ''
+        
+        #Class variable to track how many times
+        #the read function is invoked/run
         self.run = 0
         #If we don't do this, the buf value is crushed
-        #and we waste elements and/or crush the bits file.
+        #and we waste elements generating extra randNums
+ 
     def getattr(self, path):
         st = MyStat()
         if path == '/':
@@ -73,11 +79,11 @@ class GFS(Fuse):
             st.st_mode = stat.S_IFREG | 0444
             st.st_nlink = 1
             st.st_size = len(hello_str)
-        elif path == gRand_path:
+        elif path == GRAND_PATH:
             st.st_mode = stat.S_IFREG | 0444
             st.st_nlink = 1
             st.st_size = FILE_SIZE
-        elif path == gCPM_path:
+        elif path == GCPM_PATH:
             st.st_mode = stat.S_IFREG | 0444
             st.st_nlink = 1
             st.st_size = FILE_SIZE
@@ -86,12 +92,12 @@ class GFS(Fuse):
         return st
 
     def readdir(self, path, offset):
-        for r in  '.', '..', hello_path[1:], gRand_path[1:], gCPM_path[1:]:
+        for r in  '.', '..', hello_path[1:], GRAND_PATH[1:], GCPM_PATH[1:]:
             yield fuse.Direntry(r)
 
     def open(self, path, flags):
         
-        if path != gRand_path and path != hello_path and path != gCPM_path:
+        if path != GRAND_PATH and path != hello_path and path != GCPM_PATH:
             return -errno.ENOENT
         accmode = os.O_RDONLY | os.O_WRONLY | os.O_RDWR
         if (flags & accmode) != os.O_RDONLY:
@@ -107,10 +113,10 @@ class GFS(Fuse):
                 buf = hello_str[offset:offset+size]
             else:
                 buf = ''
-        elif path == gRand_path:
-            #Ignore offset
-            #Size = num of bytes/characters to read (this seems to always be 4096, idky)
-            #Path = the name of the file to access(gRand)
+        elif path == GRAND_PATH:
+            #offset = read offset from first byte
+            #size = num of bytes/characters to read (this seems to always be 4096, idky)
+            #path = the name of the file to access(gRand)
             #buf = return variable to be filled with data
             if(self.randNum != ''):
               slen = len(self.randNum)
@@ -142,7 +148,7 @@ class GFS(Fuse):
                     while(tmp != ""):
                       tmp = tmp[:-1] #get rid of '/n'
                       tmp = tmp if (tmp[-3] == ".") else (tmp + "0")#pad decimal 0
-                      elist.append(tmp)#add to list and remove
+                      elist.append(tmp)#add to list
                       tmp = fo.readline()   #read next line from bits file              
                     fo.close()#close the file
 
@@ -158,6 +164,7 @@ class GFS(Fuse):
                     wlist = elist[9:] if (len(elist) > 9) else []
                     elist = elist[:9]#We have enough elements..take first 9
                     print elist, "\n"
+
                     randNum = '' #empty string
                     while(len(elist) > 1):#loop until only 1 element left
                       compare = elist.pop(0) #remove/set first element as compare
@@ -175,6 +182,7 @@ class GFS(Fuse):
                     self.randNum = str(int(randNum[:-4], 2)) + "\n"
                     #we also convert back to string so we can return it
                     print "RandNum = ", self.randNum, "\n"
+
                     #Run offset calculations and come up
                     #With the return variable 'buf' 
                     slen = len(self.randNum)
@@ -195,10 +203,10 @@ class GFS(Fuse):
                     fo.close()
                   #End RandNum generation
 
-        elif path == gCPM_path:
+        elif path == GCPM_PATH:
             print "Skipping gCPM"
-            #Ignore offset
-            #Ignore size, size = w/e size the number is
+            #offset = offset from first byte read
+            #size = w/e size the number is
             #Path = the name of the file to access(gCPM)
             #buf = return variable to be filled with data
 
@@ -220,7 +228,9 @@ class GFS(Fuse):
         #Check to see if we are returning self.randNum
         if(buf == self.randNum):
           #We are about to return the whole randNum we made
-          #This is the time to clear it for next run
+          #Check run count so we know when to clear randNum
+          #If we clear it too soon, we'll end up wasting
+          #elements from the randBits file.
           if(self.run == 0):
             self.run = 1
           else:

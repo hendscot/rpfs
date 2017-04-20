@@ -25,6 +25,8 @@ if not hasattr(fuse, '__version__'):
 
 fuse.fuse_python_api = (0, 2)
 
+INT_SIZE = 32
+FILE_SIZE = 100
 rand_path = '/rand'
 bit_path = "/home/scotth3n/Documents/python-fuse-master/example/file.txt"
 class MyStat(fuse.Stat):
@@ -66,30 +68,37 @@ class RandFS(Fuse):
             return -errno.EACCES
 
     def read(self, path, size, offset, fh):
-        totalBytes = os.path.getsize(bit_path)
+        totalBytes = 0
         bytes      = numpy.fromfile(bit_path, dtype="uint8")
-        buf = ""
-        num = ""
+        randIntBuf = ""
+        bitstring  = ""
+        bytesUsed  = 0
         # TODO check if size of rand file is large enough
         # for request
         bits = numpy.unpackbits(bytes)
-        indx = 0
-        for byte in bytes:
-            curByte = self.bytetostring(bits[indx:indx+8])
-            num += chr(int(curByte, 2))
-            indx += 8
-        if totalBytes < 100:
-            while totalBytes < 100:
-                i = 0
-                while i < 4:
-                    num += chr(random.randint(49, 57))
-                    totalBytes = totalBytes + 1
-                    i = i + 1
-                num += "\n"
-        return num
-    def bytetostring(self, byte):
+        if bits.size >= INT_SIZE:
+            while bits.size >= INT_SIZE:
+                bitstring = self.bitstostring(bits[:INT_SIZE])
+                randIntBuf += str(int(bitstring, 2)) + '\n'
+                bits = bits[INT_SIZE:]
+                self.seed = bitstring[0]
+                bytesUsed += 4
+            totalBytes += len(randIntBuf)
+            bytes = bytes[bytesUsed:]
+            bytes.tofile(bit_path)
+        while totalBytes < FILE_SIZE:
+            bitstring = ""
+            for i in range (0, 32):
+                if random.uniform(0, 1) > .5:
+                    bitstring += "1"
+                else:
+                    bitstring += "0"
+            randIntBuf += str(int(bitstring, 2)) + "\n"
+            totalBytes = len(randIntBuf)
+        return randIntBuf
+    def bitstostring(self, bits):
         sbuf = ""
-        for bit in byte:
+        for bit in bits:
             sbuf += str(bit)
         return sbuf
 def main():

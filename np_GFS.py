@@ -53,7 +53,6 @@ class MyStat(fuse.Stat):
         self.st_ctime = 0
 
 class GFS(Fuse):
-
     def __init__(self, *args, **kw):
         Fuse.__init__(self, *args, **kw)
         #For some reason the read function
@@ -65,7 +64,6 @@ class GFS(Fuse):
         self.run = 0
         #If we don't do this, the buf value is crushed
         #and we waste elements and/or crush the bits file.
- 
     def getattr(self, path):
         st = MyStat()
         if path == '/':
@@ -205,11 +203,17 @@ class GFS(Fuse):
             #buf = return variable to be filled with data
 
             #ALG:
-              #1. Get the data from the randbits.txt file
-              #2. Sort data into array of each line as one element
-              #3. Use first element as start of minute(elements are timestamps)
-              #4. Figure out which element is closest to 1min + first element
-              #5. Count num of elements between these two. Return count.
+            #1. Get the data from the randbits.txt file
+            #2. Sort data into array of each line as one element
+            #3. Use first element as start of minute(elements are timestamps)
+            #4. Figure out which element is closest to 1min + first element
+            #5. Count num of elements between these two. Return count.
+            elems = []
+            count = 0
+            with open("BIT_FILE", "r") as bitfile:
+                for line in bitfile:
+                    elems.append(line[:-1])
+            return ""
         else:
             return -errno.ENOENT
 

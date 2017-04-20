@@ -27,8 +27,9 @@ fuse.fuse_python_api = (0, 2)
 
 INT_SIZE = 32
 FILE_SIZE = 100
-rand_path = '/rand'
-bit_path = "/home/scotth3n/Documents/python-fuse-master/example/file.txt"
+RAND_PATH = '/rand'
+BIT_PATH = "/home/scotth3n/Documents/python-fuse-master/example/file.txt"
+
 class MyStat(fuse.Stat):
     def __init__(self):
         self.st_mode = 0
@@ -49,54 +50,59 @@ class RandFS(Fuse):
         if path == '/':
             st.st_mode = stat.S_IFDIR | 0755
             st.st_nlink = 2
-        else:
+        elif path == RAND_PATH:
             st.st_mode = stat.S_IFREG | 0444
             st.st_nlink = 1
-            st.st_size = 100
+            st.st_size = FILE_SIZE
+        else:
+            return -errno.ENOENT
         return st
 
     def readdir(self, path, offset):
-        for r in  '.', '..', rand_path[1:]:
+        for r in  '.', '..', RAND_PATH[1:]:
             yield fuse.Direntry(r)
 
     def open(self, path, flags):
         # might need to work on this??
-        if path != bit_path:
+        if path != BIT_PATH:
             return path
         accmode = os.O_RDONLY | os.O_WRONLY | os.O_RDWR
         if (flags & accmode) != os.O_RDONLY:
             return -errno.EACCES
 
     def read(self, path, size, offset, fh):
-        totalBytes = 0
-        bytes      = numpy.fromfile(bit_path, dtype="uint8")
-        randIntBuf = ""
-        bitstring  = ""
-        bytesUsed  = 0
-        # TODO check if size of rand file is large enough
-        # for request
-        bits = numpy.unpackbits(bytes)
-        if bits.size >= INT_SIZE:
-            while bits.size >= INT_SIZE:
-                bitstring = self.bitstostring(bits[:INT_SIZE])
-                randIntBuf += str(int(bitstring, 2)) + '\n'
-                bits = bits[INT_SIZE:]
-                self.seed = bitstring[0]
-                bytesUsed += 4
-            totalBytes += len(randIntBuf)
-            bytes = bytes[bytesUsed:]
-            bytes.tofile(bit_path)
-        random.seed(time.time())
-        while totalBytes < FILE_SIZE:
-            bitstring = ""
-            for i in range (0, 32):
-                if random.uniform(0, 1) > .5:
-                    bitstring += "1"
-                else:
-                    bitstring += "0"
-            randIntBuf += str(int(bitstring, 2)) + "\n"
-            totalBytes = len(randIntBuf)
-        return randIntBuf
+        if path == RAND_PATH:
+            totalBytes = 0
+            bytes      = numpy.fromfile(BIT_PATH, dtype="uint8")
+            randIntBuf = ""
+            bitstring  = ""
+            bytesUsed  = 0
+            # TODO check if size of rand file is large enough
+            # for request
+            bits = numpy.unpackbits(bytes)
+            if bits.size >= INT_SIZE:
+                while bits.size >= INT_SIZE:
+                    bitstring = self.bitstostring(bits[:INT_SIZE])
+                    randIntBuf += str(int(bitstring, 2)) + '\n'
+                    bits = bits[INT_SIZE:]
+                    self.seed = bitstring[0]
+                    bytesUsed += 4
+                totalBytes += len(randIntBuf)
+                bytes = bytes[bytesUsed:]
+                bytes.tofile(BIT_PATH)
+            random.seed(time.time())
+            while totalBytes < FILE_SIZE:
+                bitstring = ""
+                for i in range (0, 32):
+                    if random.uniform(0, 1) > .5:
+                        bitstring += "1"
+                    else:
+                        bitstring += "0"
+                randIntBuf += str(int(bitstring, 2)) + "\n"
+                totalBytes = len(randIntBuf)
+            return randIntBuf
+        else:
+            return -errno.ENOENT
     def bitstostring(self, bits):
         sbuf = ""
         for bit in bits:

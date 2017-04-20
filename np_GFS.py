@@ -37,7 +37,7 @@ gCPM_path = '/g_cpm'
 BIT_PATH = "/home/nmpoole/fuse/randtimegeiger.txt"
 
 #A new size value for the files
-FILE_SIZE = 100
+FILE_SIZE = 12
 
 class MyStat(fuse.Stat):
     def __init__(self):
@@ -53,8 +53,17 @@ class MyStat(fuse.Stat):
         self.st_ctime = 0
 
 class GFS(Fuse):
-    def __init__(self):
-        self.timesRead = 0
+    def __init__(self, *args, **kw):
+        Fuse.__init__(self, *args, **kw)
+        #For some reason the read function
+        #is ran multiple times for a single read
+        #We need buf to be a class variable so 
+        #that it doesn't get overwritten on those
+        #extra calls after we edit the bits file.
+        self.randNum = ''
+        self.run = 0
+        #If we don't do this, the buf value is crushed
+        #and we waste elements and/or crush the bits file.
     def getattr(self, path):
         st = MyStat()
         if path == '/':
@@ -103,77 +112,88 @@ class GFS(Fuse):
             #Size = num of bytes/characters to read (this seems to always be 4096, idky)
             #Path = the name of the file to access(gRand)
             #buf = return variable to be filled with data
-
-            #Open up the randombits file
-            if(os.path.isfile(BIT_PATH)):
-              fo = open(BIT_PATH, "r")
-              if(fo.closed == "false"):
-                print "Unable to open file ", fo.name, "\n"
+            if(self.randNum != ''):
+              slen = len(self.randNum)
+              if(offset < slen):
+                if(offset + size > slen):
+                  size = slen - offset
+                buf = self.randNum[offset:offset+size]
               else:
-                print fo.name, " has been successfully opened!\n"
-                self.timesRead += 1
-                
-                #Read the file line by line
-                n = 0 #element counter
-                elist = [] #empty list
-                tmp = fo.readline() #read first line
-                while(tmp != ""):
-                  tmp = tmp[:-1] #get rid of '/n'
-                  tmp = tmp if (tmp[-3] == ".") else (tmp + "0")#pad decimal 0
-                  elist.append(tmp)#add to list and remove
-                  n = n + 1             #increment element counter
-                  tmp = fo.readline()   #read next line from bits file              
-                fo.close()#close the file
-                #Make sure we have enough elements to generate
-                #a single random number: 9C2...
-                tmpList = elist[:] #copy the list so we don't lose it
-                while(len(elist) < 9):
-                  random.seed(tmpList.pop(0))#remove first element, set as rand seed
-                  elist.append(str(random.random() + time.time()))#append new random number
-                #end Generation loop
-                #Save remaining elements?
-                wlist = elist[9:] if (len(elist) > 9) else []
-                elist = elist[:9]#We have enough elements..take first 9
-                print elist, "\n"
-                randNum = '' #empty string
-                while(len(elist) > 1):#loop until only 1 element left
-                  compare = elist.pop(0) #remove/set first element as compare
-                  for element in elist: #loop remaining elements
-                    if(int(element[-2:]) > int(compare[-2:])):
-                      randNum += '0'
-                    else:
-                      randNum += '1'
-                  #list iteration finished
-                print randNum, "\n"
-                print "Count: ", len(randNum), "\n"
-                #end binary loop  
-                buf = str(int(randNum[:-4], 2)) + "\n"#convert "binary" string to unsigned int
-                #we also convert back to string so we can return it
-                #Working to this point!!!
-                #11 - Will finish this out!!!
-                if(len(wlist) != 0):
-                  fo = open(BIT_PATH, "w+")
-                  for line in wlist:
-                    fo.write(line + "\n")
-                  fo.close()
-                else:
-                  os.remove(BIT_PATH)
+                buf = ''
             else:
-              buf = ''
-            #ALG:
-            #1. Get the data from the randbits.txt file
-            #2. Sort data into "list" of each line as one element
-            #X3. Based on "size" determine if enough elements are available for request(sizex9){9C2}
-              #size is always 4096, idky. So I'm forcing one rand number..
-            #4. If not enough elements, attempt to generate more, jmp #7
-            #5. If enough elements, use combination math and comparisons to generate 32bits x size
-            #6. Pack each 32bit set into a number and add number as an element to the return variable
-            #   jmp, #11
-            #7. Determine amount of elements to generate based on current element count
-            #8. Repeat Until requirements met: Use each element + timestamp to gen. new rand num.
-            #9. After first run, use new rand numbers + timestamp to gen new rand numbers.
-            #10. Once finished, jmp #5.
-            #11. Finally clear all used elements from the randbits file
+              #Check for randfile availability
+              if(os.path.isfile(BIT_PATH) == 0):
+                #No File!
+                buf = 0
+              else:
+                #Open up the randFile for reading
+                fo = open(BIT_PATH, "r")
+                if(fo.closed == "false"):
+                  print "Unable to open file ", fo.name, "\n"
+                else:
+                  print fo.name, " has been successfully opened!\n"
+                  
+                  #Read the file line by line
+                  elist = [] #empty list
+                  tmp = fo.readline() #read first line
+                  if(tmp == ""): #skip rand generation, file empty
+                    self.randNum = 0
+                  else:
+                    while(tmp != ""):
+                      tmp = tmp[:-1] #get rid of '/n'
+                      tmp = tmp if (tmp[-3] == ".") else (tmp + "0")#pad decimal 0
+                      elist.append(tmp)#add to list and remove
+                      tmp = fo.readline()   #read next line from bits file              
+                    fo.close()#close the file
+
+                    #Make sure we have enough elements to generate
+                    #a single random number: 9C2...
+                    tmpList = elist[:] #copy the list so we don't lose it
+                    while(len(elist) < 9):
+                      random.seed(tmpList.pop(0))#remove first element, set as rand seed
+                      elist.append(str(random.random() + time.time()))#append new random number
+                    #end Generation loop
+
+                    #Save remaining elements?
+                    wlist = elist[9:] if (len(elist) > 9) else []
+                    elist = elist[:9]#We have enough elements..take first 9
+                    print elist, "\n"
+                    randNum = '' #empty string
+                    while(len(elist) > 1):#loop until only 1 element left
+                      compare = elist.pop(0) #remove/set first element as compare
+                      for element in elist: #loop remaining elements
+                        if(int(element[-2:]) > int(compare[-2:])):
+                          randNum += '0'
+                        else:
+                          randNum += '1'
+                      #list iteration finished
+                    print randNum, "\n"
+                    print "Count: ", len(randNum), "\n"
+                    #end binary loop
+                    
+                    #convert "binary" string to unsigned int
+                    self.randNum = str(int(randNum[:-4], 2)) + "\n"
+                    #we also convert back to string so we can return it
+                    print "RandNum = ", self.randNum, "\n"
+                    #Run offset calculations and come up
+                    #With the return variable 'buf' 
+                    slen = len(self.randNum)
+                    if(offset < slen):
+                      if(offset + size > slen):
+                       size = slen - offset
+                      buf = self.randNum[offset:offset+size]
+                    else:
+                      buf = ''                    
+
+                    #Rewrite bits file to clear used elements
+                    fo = open(BIT_PATH, "w+")
+                    if(len(wlist) != 0):
+                      for line in wlist:
+                        fo.write(line + "\n")
+                    else:
+                      fo.write('') #Empty File rather than delete it
+                    fo.close()
+                  #End RandNum generation
 
         elif path == gCPM_path:
             print "Skipping gCPM"
@@ -196,6 +216,17 @@ class GFS(Fuse):
             return ""
         else:
             return -errno.ENOENT
+
+        #Check to see if we are returning self.randNum
+        if(buf == self.randNum):
+          #We are about to return the whole randNum we made
+          #This is the time to clear it for next run
+          if(self.run == 0):
+            self.run = 1
+          else:
+            self.run = 0
+            self.randNum = ''
+          
         return buf
 
 def main():

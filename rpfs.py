@@ -18,7 +18,7 @@ from fuse import Fuse
 # if on your own system CHECK IF ON UNIVERSITY/PI??
 import numpy
 import random
-
+import time
 if not hasattr(fuse, '__version__'):
     raise RuntimeError, \
         "your fuse-py doesn't know of fuse.__version__, probably it's too old."
@@ -86,6 +86,7 @@ class RandFS(Fuse):
             totalBytes += len(randIntBuf)
             bytes = bytes[bytesUsed:]
             bytes.tofile(bit_path)
+        random.seed(time.time())
         while totalBytes < FILE_SIZE:
             bitstring = ""
             for i in range (0, 32):

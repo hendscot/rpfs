@@ -10,7 +10,7 @@
 #
 #    Modified By: Nathan M. Poole, A3-FUSE group project C435
 
-import os, stat, errno, random, time
+import os, stat, errno, random, time, numpy
 # pull in some spaghetti to make this stuff work without fuse-py being installed
 try:
     import _find_fuse_parts
@@ -35,6 +35,18 @@ GCPM_PATH = '/g_cpm'
 
 #Full path to the random bits file
 BIT_PATH = "/home/nmpoole/fuse/randtimegeiger.txt"
+
+#Number of combination elements
+#Needed based on byte size requested
+BIT_64 = 12 #64 bit uint
+BIT_32 = 9  #32 bit uint
+BIT_16 = 7  #16 bit uint
+BIT_8  = 5  #8  bit uint
+
+SUB_64 = 2 #12C2 = 66(-2) = 64
+SUB_32 = 4 #9C2  = 36(-4) = 32
+SUB_16 = 5 #7C2  = 21(-5) = 16
+SUB_8 = 2  #5C2  = 10(-2) = 8
 
 #A new size value for the files
 FILE_SIZE = 100
@@ -62,7 +74,7 @@ class GFS(Fuse):
         
         #Class variable to hold onto random num
         #we generate for g_rand file
-        self.randNum = ''
+        self.randBytes = ''
         
         #Class variable to track how many times
         #the read function is invoked/run
@@ -82,7 +94,7 @@ class GFS(Fuse):
         elif path == GRAND_PATH:
             st.st_mode = stat.S_IFREG | 0444
             st.st_nlink = 1
-            st.st_size = FILE_SIZE
+            st.st_size = len(self.randBytes)
         elif path == GCPM_PATH:
             st.st_mode = stat.S_IFREG | 0444
             st.st_nlink = 1
@@ -118,12 +130,12 @@ class GFS(Fuse):
             #size = num of bytes/characters to read (this seems to always be 4096, idky)
             #path = the name of the file to access(gRand)
             #buf = return variable to be filled with data
-            if(self.randNum != ''):
-              slen = len(self.randNum)
+            if(self.randBytes != ''):
+              slen = len(self.randBytes)
               if(offset < slen):
                 if(offset + size > slen):
                   size = slen - offset
-                buf = self.randNum[offset:offset+size]
+                buf = unichr(int(self.randBytes[offset:offset+size],2))
               else:
                 buf = ''
             else:
@@ -143,7 +155,8 @@ class GFS(Fuse):
                   elist = [] #empty list
                   tmp = fo.readline() #read first line
                   if(tmp == ""): #skip rand generation, file empty
-                    self.randNum = 0
+                    self.randBytes = ''
+                    buf = ''
                   else:
                     while(tmp != ""):
                       tmp = tmp[:-1] #get rid of '/n'
@@ -152,46 +165,81 @@ class GFS(Fuse):
                       tmp = fo.readline()   #read next line from bits file              
                     fo.close()#close the file
 
-                    #Make sure we have enough elements to generate
-                    #a single random number: 9C2...
-                    tmpList = elist[:] #copy the list so we don't lose it
-                    while(len(elist) < 9):
-                      random.seed(tmpList.pop(0))#remove first element, set as rand seed
-                      elist.append(str(random.random() + time.time()))#append new random number
-                    #end Generation loop
+                    #Determine how many elements we should use
+                    #size is in bytes...? 
+                    #1byte = 8bits
+                    #2bytes = 16bits
+                      #3bytes = 24bits
+                    #4bytes = 32bits
+                      #5bytes = 40bits
+                      #6bytes = 48bits
+                      #7bytes = 56bits
+                    #8bytes = 64bits
+                    if(size < 2):
+                      eNum = BIT_8
+                      eSub = SUB_8
+                    elif(size < 3):
+                      eNum = BIT_16
+                      eSub = SUB_16
+                    else:#elif(size < 5):
+                      eNum = BIT_32
+                      eSub = SUB_32
+                    #else:#elif(size < 9):
+                      #eNum = BIT_64
+                      #eSub = SUB_64
+                    #else:
+                      #eNum = 0 #ALL of it!
 
-                    #Save remaining elements?
-                    wlist = elist[9:] if (len(elist) > 9) else []
-                    elist = elist[:9]#We have enough elements..take first 9
-                    print elist, "\n"
+                    #Determine if we should use up all rand data
+                    #Or be conservative by only using what is needed.
+                    if(eNum == 0):
+                      #USE IT ALL!
+                      wlist = [] #No remaining elements
+                      print elist, "\n"
+                    else:
+                      #Make sure we have enough elements to generate
+                      #a single random number bit sequence: eNum-C-2
+                      tmpList = elist[:] #copy the list so we don't lose it
+                      while(len(elist) < eNum):
+                        random.seed(tmpList.pop(0))#remove first element, set as rand seed
+                        elist.append(str(random.random() + time.time()))#append new random number
+                      #end Generation loop
 
-                    randNum = '' #empty string
+                      #Save remaining elements?
+                      wlist = elist[eNum:] if (len(elist) > eNum) else []
+                      elist = elist[:eNum]#We have enough elements..take first eNum
+                      print elist, "\n"
+
+                    randNum = [] #empty list
                     while(len(elist) > 1):#loop until only 1 element left
                       compare = elist.pop(0) #remove/set first element as compare
                       for element in elist: #loop remaining elements
                         if(int(element[-2:]) > int(compare[-2:])):
-                          randNum += '0'
+                          randNum.append('0')
                         else:
-                          randNum += '1'
+                          randNum.append('1')
                       #list iteration finished
-                    print randNum, "\n"
-                    print "Count: ", len(randNum), "\n"
+                    print randNum[:-eSub], "\n"
+                    print "Count: ", len(randNum[:-eSub]), "\n"
                     #end binary loop
                     
-                    #convert "binary" string to unsigned int
-                    self.randNum = str(int(randNum[:-4], 2)) + "\n"
-                    #we also convert back to string so we can return it
-                    print "RandNum = ", self.randNum, "\n"
+                    #numpy convert to array
+                    np = numpy.array(randNum[:-eSub])
+                    print np, "\n"
+                    
+                    #numpy convert to bytes
+                    self.randBytes = np.tostring()
+                    print self.randBytes, "\n"
 
                     #Run offset calculations and come up
                     #With the return variable 'buf' 
-                    slen = len(self.randNum)
+                    slen = len(self.randBytes)
                     if(offset < slen):
                       if(offset + size > slen):
                        size = slen - offset
-                      buf = self.randNum[offset:offset+size]
+                      buf = unichr(int(self.randBytes[offset:offset+size],2))
                     else:
-                      buf = ''                    
+                      buf = ''
 
                     #Rewrite bits file to clear used elements
                     fo = open(BIT_PATH, "w+")
@@ -225,8 +273,8 @@ class GFS(Fuse):
         else:
             return -errno.ENOENT
 
-        #Check to see if we are returning self.randNum
-        if(buf == self.randNum):
+        #Check to see if we are returning self.randBytes
+        if(buf == self.randBytes):
           #We are about to return the whole randNum we made
           #Check run count so we know when to clear randNum
           #If we clear it too soon, we'll end up wasting
@@ -235,7 +283,7 @@ class GFS(Fuse):
             self.run = 1
           else:
             self.run = 0
-            self.randNum = ''
+            self.randBytes = ''
           
         return buf
 

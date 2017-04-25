@@ -27,10 +27,9 @@ int main(int argc, char **argv)
   //TESTING OPENING FILE
   //NOT ALLOWED MODES: W, W+, A, R+, A+
   //ALLOWED MODES: R -only
-  fp = fopen(argv[1], "r"); 
   
   //Tell us if the file was opened
-  if(fp != NULL)
+  if((fp = fopen(argv[1], "r")) != NULL)
   {
     printf("%s has been opened successfully!\n", argv[1]);
     
@@ -41,10 +40,36 @@ int main(int argc, char **argv)
     
     //First we will try to read a single character
     tmpChar = fgetc(fp);
-    printf("Successfully read character from file %s: %c \n", argv[1], tmpChar);
-      
-    //Attempt to read multiple characters
-    if(fgets(buff, 5, fp) == NULL)
+    printf("Attempting read of one character from file %s.\n", argv[1]);
+    printf("Character:%c.\n\n", tmpChar);
+  }
+  else
+  {
+    printf("Unable to open %s...\nExiting...\n");
+  }
+  fclose(fp);
+
+  //Attempt to read multiple characters, one at a time
+  if((fp = fopen(argv[1], "r")) != NULL)
+  {
+    printf("Attemping to read all characters one at a time:");
+    while((tmpChar = fgetc(fp)) != EOF)
+    {
+      printf("%c", tmpChar);
+    }
+    printf(".\n\n");
+  }
+  else
+  {
+    printf("Unable to open %s...\nExiting...\n");
+  }
+  fclose(fp);
+
+  //Attempt to read multiple characters
+  if((fp = fopen(argv[1], "r")) != NULL)
+  {
+    //Attempt to read multiple characters at once (firstline)
+    if(fgets(buff, 255, fp) == NULL)
     {
       //Failure
       printf("Unable to read multiple characters from file %s!\nExiting...\n", argv[1]);
@@ -52,17 +77,17 @@ int main(int argc, char **argv)
     else
     { 
       //Success!
-      printf("Successfully read multiple characters from file %s: %s \n", argv[1], buff);
-      printf("END OF TEST! Exiting...\n");
+      printf("Successfully read first line from file %s.\n", argv[1]);
+      printf("FirstLine(255):%s.\n\n", buff);
+      printf("END OF TEST! Exiting...\n\n");
     }
-
-    //Close the file
-    fclose(fp);
   }
   else
   {
     printf("Unable to open %s...\nExiting...\n");
   }
+  fclose(fp);
+
 
   return 0;
 }

@@ -10,7 +10,7 @@
 #
 #    Modified By: Nathan M. Poole, A3-FUSE group project C435
 
-import os, stat, errno, random, time, numpy
+import os, stat, errno, random, time
 # pull in some spaghetti to make this stuff work without fuse-py being installed
 try:
     import _find_fuse_parts
@@ -37,20 +37,15 @@ GCPM_PATH = '/g_cpm'
 BIT_PATH = "/home/nmpoole/fuse/randtimegeiger.txt"
 
 #Number of combination elements
-#Needed based on byte size requested
+#Needed based on bit size requested
 BIT_64 = 12 #64 bit uint
 BIT_32 = 9  #32 bit uint
 BIT_16 = 7  #16 bit uint
 BIT_8  = 5  #8  bit uint
 
-SUB_64 = 2 #12C2 = 66(-2) = 64
-SUB_32 = 4 #9C2  = 36(-4) = 32
-SUB_16 = 5 #7C2  = 21(-5) = 16
-SUB_8 = 2  #5C2  = 10(-2) = 8
-
 #A new size value for the files
 #(Max number of bytes to return!)
-FILE_SIZE = 100
+FILE_SIZE = 25
 
 class MyStat(fuse.Stat):
     def __init__(self):
@@ -95,7 +90,7 @@ class GFS(Fuse):
         elif path == GRAND_PATH:
             st.st_mode = stat.S_IFREG | 0444
             st.st_nlink = 1
-            st.st_size = 16
+            st.st_size = FILE_SIZE
         elif path == GCPM_PATH:
             st.st_mode = stat.S_IFREG | 0444
             st.st_nlink = 1
@@ -127,22 +122,6 @@ class GFS(Fuse):
             else:
                 buf = ''
         elif path == GRAND_PATH:
-#New ALG:
-#Read bits file into 1 line per element array
-#Determine if we have enough elements for bytes requested
-  #5 elements per byte (5C2 = 10bits-2 = 8bits)
-  #If not, generate enough elements for byte request 5*size
-#For every "byte" requested:
-  #generate an 8 bit binary array ...ex:[1, 1, 0, 0, 0, 1, 1, 0]
-  #Remove used elements
-#Pack 8bit arrays into numpy.packbits
-#Each element of numpy.packbits is now 1 byte of data...
-#for each byte of data(element):
-  #convert byte to unsigned? char
-  #add char to return string
-#Run offset calculations on return string
-#EoA
-
             #offset = read offset from first byte
             #size = num of bytes/characters to read (this seems to always be 4096, idky)
             #path = the name of the file to access(gRand)
@@ -159,7 +138,7 @@ class GFS(Fuse):
               #Check for randfile availability
               if(os.path.isfile(BIT_PATH) == 0):
                 #No File!
-                buf = 'Sorry, comeback later!'
+                buf = 'Sorry, come back later!'
               else:
                 #Open up the randFile for reading
                 fo = open(BIT_PATH, "r")
@@ -187,16 +166,12 @@ class GFS(Fuse):
                     #Determine how many elements we should use
                     if(size < 2):
                       eNum = BIT_8
-                      eSub = SUB_8
                     elif(size < 3):
                       eNum = BIT_16
-                      eSub = SUB_16
                     elif(size < 5):
                       eNum = BIT_32
-                      eSub = SUB_32
                     else:
                       eNum = BIT_64 #this is the maximum per read
-                      eSub = SUB_64
 
                     #Determine how many elements we should use
                     #size = number of bytes requested, we need
@@ -269,18 +244,7 @@ class GFS(Fuse):
                     #and add it to the self.randBytes string
                     for bitList in bitLists:
                       self.randBytes += chr(int(''.join(str(e) for e in bitList), 2))
-
-                    #numpy convert to array
-                    #np = numpy.array(bitLists)
-                    #print np, "\n"
                     print self.randBytes, "\n"
-                    #seems to work till this point
-
-                    #numpy convert to bytes
-                    #self.randBytes = numpy.packbits(np, 1)
-                    #print self.randBytes, "\n"
-                    #self.randBytes, should now hold multiple elements
-                    #each element being an unsigned 8bit integer
 
                     #Run offset calculations and come up
                     #With the return variable 'buf' 

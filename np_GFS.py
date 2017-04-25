@@ -95,7 +95,7 @@ class GFS(Fuse):
         elif path == GRAND_PATH:
             st.st_mode = stat.S_IFREG | 0444
             st.st_nlink = 1
-            st.st_size = 8
+            st.st_size = 16
         elif path == GCPM_PATH:
             st.st_mode = stat.S_IFREG | 0444
             st.st_nlink = 1
@@ -152,7 +152,7 @@ class GFS(Fuse):
               if(offset < slen):
                 if(offset + size > slen):
                   size = slen - offset
-                buf = self.randBytes[offset:offset+size]
+                buf = self.randBytes[offset:offset+size] + "\n"
               else:
                 buf = ''
             else:
@@ -269,6 +269,7 @@ class GFS(Fuse):
                     #and add it to the self.randBytes string
                     for bitList in bitLists:
                       self.randBytes += chr(int(''.join(str(e) for e in bitList), 2))
+
                     #numpy convert to array
                     #np = numpy.array(bitLists)
                     #print np, "\n"
@@ -287,7 +288,7 @@ class GFS(Fuse):
                     if(offset < slen):
                       if(offset + size > slen):
                        size = slen - offset
-                      buf = self.randBytes[offset:offset+size]
+                      buf = self.randBytes[offset:offset+size] + "\n"
                     else:
                       buf = ''
 
@@ -324,7 +325,7 @@ class GFS(Fuse):
             return -errno.ENOENT
 
         #Check to see if we are returning self.randBytes
-        if(buf == self.randBytes):
+        if(buf == self.randBytes + "\n"):
           #We are about to return the whole randNum we made
           #Check run count so we know when to clear randNum
           #If we clear it too soon, we'll end up wasting

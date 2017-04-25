@@ -95,7 +95,7 @@ class GFS(Fuse):
         elif path == GRAND_PATH:
             st.st_mode = stat.S_IFREG | 0444
             st.st_nlink = 1
-            st.st_size = len(self.randBytes)
+            st.st_size = 8
         elif path == GCPM_PATH:
             st.st_mode = stat.S_IFREG | 0444
             st.st_nlink = 1
@@ -273,6 +273,7 @@ class GFS(Fuse):
                     #np = numpy.array(bitLists)
                     #print np, "\n"
                     print self.randBytes, "\n"
+                    #seems to work till this point
 
                     #numpy convert to bytes
                     #self.randBytes = numpy.packbits(np, 1)

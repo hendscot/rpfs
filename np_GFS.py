@@ -45,7 +45,7 @@ BIT_8  = 5  #8  bit uint
 
 #A new size value for the files
 #(Max number of bytes to return!)
-FILE_SIZE = 25
+FILE_SIZE = 50
 
 class MyStat(fuse.Stat):
     def __init__(self):
@@ -123,7 +123,7 @@ class GFS(Fuse):
                 buf = ''
         elif path == GRAND_PATH:
             #offset = read offset from first byte
-            #size = num of bytes/characters to read (this seems to always be 4096, idky)
+            #size = num of bytes/characters to read
             #path = the name of the file to access(gRand)
             #buf = return variable to be filled with data
             if(self.randBytes != ''):
@@ -138,7 +138,7 @@ class GFS(Fuse):
               #Check for randfile availability
               if(os.path.isfile(BIT_PATH) == 0):
                 #No File!
-                buf = 'Sorry, come back later!'
+                buf = '\nSorry, not harvesting right now...\n\n'
               else:
                 #Open up the randFile for reading
                 fo = open(BIT_PATH, "r")
@@ -151,8 +151,7 @@ class GFS(Fuse):
                   elist = [] #empty list
                   tmp = fo.readline() #read first line
                   if(tmp == ""): #skip rand generation, file empty
-                    self.randBytes = ''
-                    buf = ''
+                    buf = '\nSorry, no bits available right now...\n\n'
                   else:
                     while(tmp != ""):
                       tmp = tmp[:-1] #get rid of '/n'
